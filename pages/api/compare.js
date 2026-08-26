@@ -41,7 +41,7 @@ async function fetchTopQueries(searchconsole, siteUrl, url, startDate, endDate) 
       dimensionFilterGroups: [
         { filters: [{ dimension: "page", operator: "equals", expression: url }] },
       ],
-      rowLimit: 15,
+      rowLimit: 20,
     },
   });
   return (response.data.rows || []).map((r) => ({
@@ -49,6 +49,81 @@ async function fetchTopQueries(searchconsole, siteUrl, url, startDate, endDate) 
     clicks: r.clicks,
     impressions: r.impressions,
   }));
+}
+
+function computeRecommendation(results, commonQueries) {
+  if (results.length !== 2) return null;
+
+  const [a, b] = results;
+  const smallerQueryCount = Math.min(a.topQueries.length, b.topQueries.length) || 1;
+  const overlapPercent = Math.round((commonQueries.length / smallerQueryCount) * 100);
+
+  const totalClicks = a.clicks + b.clicks;
+  const shareB = totalClicks > 0 ? b.clicks / totalClicks : 0.5;
+  const skew = Math.abs(shareB - 0.5);
+
+  const winnerCounts = { a: 0, b: 0 };
+  if (a.clicks !== b.clicks) winnerCounts[a.clicks > b.clicks ? "a" : "b"]++;
+  if (a.impressions !== b.impressions) winnerCounts[a.impressions > b.impressions ? "a" : "b"]++;
+  if (a.ctr !== b.ctr) winnerCounts[a.ctr > b.ctr ? "a" : "b"]++;
+  if (a.position !== b.position) winnerCounts[a.position < b.position ? "a" : "b"]++;
+
+  const signals = [
+    `${overlapPercent}% des requêtes principales sont communes aux deux articles`,
+    `Article A : ${a.clicks} clics, Article B : ${b.clicks} clics`,
+    `Article ${winnerCounts.a > winnerCounts.b ? "A" : "B"} gagne sur ${Math.max(winnerCounts.a, winnerCounts.b)} des 4 métriques SEO`,
+  ];
+
+  if (overlapPercent < 20) {
+    return {
+      verdict: "keep",
+      balance: 50,
+      headline: "Conserver les deux articles",
+      reason: `Ces deux articles ne partagent que ${overlapPercent}% de leurs requêtes principales : ils répondent à des intentions de recherche différentes et se complètent plutôt qu'ils ne se concurrencent.`,
+      signals,
+      suggestions: [
+        "Ajoutez un maillage interne entre les deux articles pour guider le lecteur de l'un vers l'autre",
+        "Vérifiez que les titres et méta-descriptions reflètent bien deux angles distincts",
+      ],
+    };
+  }
+
+  if (skew < 0.15) {
+    return {
+      verdict: "watch",
+      balance: 50,
+      headline: "Conserver les deux, mais surveiller la cannibalisation",
+      reason: `${overlapPercent}% de requêtes communes et des performances proches entre les deux articles : ils se concurrencent probablement sur les mêmes résultats Google, sans qu'aucun ne prenne clairement le dessus.`,
+      signals,
+      suggestions: [
+        "Différenciez plus nettement les angles ou les intentions de recherche couvertes par chaque article",
+        "Envisagez de recentrer l'un des deux sur une requête plus spécifique et moins concurrente avec l'autre",
+      ],
+    };
+  }
+
+  const winnerIsB = shareB > 0.5;
+  const winnerLabel = winnerIsB ? "B" : "A";
+  const loserLabel = winnerIsB ? "A" : "B";
+  const winnerClicks = winnerIsB ? b.clicks : a.clicks;
+  const loserClicks = winnerIsB ? a.clicks : b.clicks;
+  const rawBalance = 50 + (winnerIsB ? 1 : -1) * Math.min(skew, 0.5) * 100;
+  const balance = Math.max(5, Math.min(95, rawBalance));
+
+  return {
+    verdict: "redirect",
+    balance,
+    winnerLabel,
+    loserLabel,
+    headline: `Rediriger l'article ${loserLabel} vers l'article ${winnerLabel}`,
+    reason: `${overlapPercent}% de requêtes communes et l'article ${winnerLabel} capte nettement plus de trafic (${winnerClicks} clics contre ${loserClicks}). Le maintien des deux pages dilue probablement leur potentiel de positionnement.`,
+    signals,
+    suggestions: [
+      `Avant toute redirection, vérifiez qu'aucune information utile de l'article ${loserLabel} n'est absente de l'article ${winnerLabel}`,
+      `Mettez en place une redirection 301 de l'article ${loserLabel} vers l'article ${winnerLabel}`,
+      `Renforcez l'article ${winnerLabel} avec le meilleur du contenu de l'article ${loserLabel} avant de rediriger`,
+    ],
+  };
 }
 
 export default async function handler(req, res) {
@@ -87,7 +162,9 @@ export default async function handler(req, res) {
       ...queryLists.reduce((acc, set) => new Set([...acc].filter((q) => set.has(q)))),
     ];
 
-    return res.status(200).json({ results, commonQueries });
+    const recommendation = computeRecommendation(results, commonQueries);
+
+    return res.status(200).json({ results, commonQueries, recommendation });
   } catch (error) {
     console.error(error);
     const detail =
