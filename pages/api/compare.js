@@ -51,6 +51,41 @@ async function fetchTopQueries(searchconsole, siteUrl, url, startDate, endDate) 
   }));
 }
 
+async function fetchPublishedDate(url) {
+  try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 5000);
+    const response = await fetch(url, {
+      headers: { "User-Agent": "Mozilla/5.0 (compatible; UniMediasKPITool/1.0)" },
+      signal: controller.signal,
+    });
+    clearTimeout(timeout);
+    if (!response.ok) return null;
+    const html = await response.text();
+    const patterns = [
+      /<meta[^>]+property=["']article:published_time["'][^>]+content=["']([^"']+)["']/i,
+      /<meta[^>]+content=["']([^"']+)["'][^>]+property=["']article:published_time["']/i,
+      /"datePublished"\s*:\s*"([^"]+)"/i,
+      /<meta[^>]+name=["']date["'][^>]+content=["']([^"']+)["']/i,
+      /<time[^>]+datetime=["']([^"']+)["']/i,
+    ];
+    for (const re of patterns) {
+      const m = html.match(re);
+      if (m && m[1]) {
+        const d = new Date(m[1]);
+        if (!isNaN(d.getTime())) return d.toISOString().slice(0, 10);
+      }
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+function clamp(n, min, max) {
+  return Math.max(min, Math.min(max, n));
+}
+
 function computeRecommendation(results, commonQueries) {
   if (results.length !== 2) return null;
 
@@ -69,7 +104,7 @@ function computeRecommendation(results, commonQueries) {
   if (a.position !== b.position) winnerCounts[a.position < b.position ? "a" : "b"]++;
 
   const signals = [
-    `${overlapPercent}% des requêtes principales sont communes aux deux articles`,
+    `${overlapPercent}% des requêtes principales sont communes`,
     `Article A : ${a.clicks} clics, Article B : ${b.clicks} clics`,
     `Article ${winnerCounts.a > winnerCounts.b ? "A" : "B"} gagne sur ${Math.max(winnerCounts.a, winnerCounts.b)} des 4 métriques SEO`,
   ];
@@ -77,7 +112,7 @@ function computeRecommendation(results, commonQueries) {
   if (overlapPercent < 20) {
     return {
       verdict: "keep",
-      balance: 50,
+      confidence: clamp(Math.round(95 - overlapPercent * 2), 55, 95),
       headline: "Conserver les deux articles",
       reason: `Ces deux articles ne partagent que ${overlapPercent}% de leurs requêtes principales : ils répondent à des intentions de recherche différentes et se complètent plutôt qu'ils ne se concurrencent.`,
       signals,
@@ -91,8 +126,8 @@ function computeRecommendation(results, commonQueries) {
   if (skew < 0.15) {
     return {
       verdict: "watch",
-      balance: 50,
-      headline: "Conserver les deux, mais surveiller la cannibalisation",
+      confidence: clamp(Math.round(70 - skew * 100), 50, 75),
+      headline: "Conserver, mais surveiller la cannibalisation",
       reason: `${overlapPercent}% de requêtes communes et des performances proches entre les deux articles : ils se concurrencent probablement sur les mêmes résultats Google, sans qu'aucun ne prenne clairement le dessus.`,
       signals,
       suggestions: [
@@ -107,12 +142,10 @@ function computeRecommendation(results, commonQueries) {
   const loserLabel = winnerIsB ? "A" : "B";
   const winnerClicks = winnerIsB ? b.clicks : a.clicks;
   const loserClicks = winnerIsB ? a.clicks : b.clicks;
-  const rawBalance = 50 + (winnerIsB ? 1 : -1) * Math.min(skew, 0.5) * 100;
-  const balance = Math.max(5, Math.min(95, rawBalance));
 
   return {
     verdict: "redirect",
-    balance,
+    confidence: clamp(Math.round(50 + skew * 90), 55, 95),
     winnerLabel,
     loserLabel,
     headline: `Rediriger l'article ${loserLabel} vers l'article ${winnerLabel}`,
@@ -131,7 +164,7 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: "Méthode non autorisée" });
   }
 
-  const { urls, startDate, endDate } = req.body;
+  const { urls, startDate, endDate, dates } = req.body;
 
   if (!urls || !Array.isArray(urls) || urls.length === 0) {
     return res.status(400).json({ error: "Aucune URL fournie" });
@@ -147,13 +180,15 @@ export default async function handler(req, res) {
     const searchconsole = getClient();
 
     const results = await Promise.all(
-      urls.map(async (rawUrl) => {
+      urls.map(async (rawUrl, index) => {
         const url = rawUrl.trim();
-        const [totals, topQueries] = await Promise.all([
+        const providedDate = dates && dates[index] ? dates[index] : null;
+        const [totals, topQueries, publishedDate] = await Promise.all([
           fetchTotals(searchconsole, siteUrl, url, startDate, endDate),
           fetchTopQueries(searchconsole, siteUrl, url, startDate, endDate),
+          providedDate ? Promise.resolve(providedDate) : fetchPublishedDate(url),
         ]);
-        return { url, ...totals, topQueries };
+        return { url, ...totals, topQueries, publishedDate };
       })
     );
 
