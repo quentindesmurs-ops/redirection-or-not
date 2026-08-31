@@ -32,6 +32,12 @@ const VERDICT_COLOR = {
   redirect: "#C1440E",
 };
 
+const VERDICT_WORD = {
+  keep: "CONSERVER",
+  watch: "SURVEILLER",
+  redirect: "REDIRIGER",
+};
+
 export default function Home() {
   const [urls, setUrls] = useState(["", ""]);
   const [startDate, setStartDate] = useState(defaultStart());
@@ -97,14 +103,17 @@ export default function Home() {
     ? Math.round(((data?.commonQueries.length || 0) / smallerQueryCount) * 100)
     : 0;
 
-  let needleX = 150;
-  let needleY = 55;
+  const CX = 150, CY = 150, R = 120;
+  let needleAngleDeg = 90;
   if (rec) {
-    const angleDeg = 180 - (rec.balance / 100) * 180;
-    const angleRad = (angleDeg * Math.PI) / 180;
-    needleX = 150 + 95 * Math.cos(angleRad);
-    needleY = 150 - 95 * Math.sin(angleRad);
+    needleAngleDeg = 180 - (rec.balance / 100) * 180;
   }
+  const rad = (needleAngleDeg * Math.PI) / 180;
+  const needleLen = R - 20;
+  const needleX = CX + needleLen * Math.cos(rad);
+  const needleY = CY - needleLen * Math.sin(rad);
+  const leftX = CX + R * Math.cos(Math.PI);
+  const rightX = CX + R * Math.cos(0);
 
   return (
     <main className="wrap">
@@ -119,315 +128,4 @@ export default function Home() {
       <section className="panel controls">
         <h3>Articles à comparer</h3>
         {urls.map((url, i) => (
-          <div className="url-row" key={i}>
-            <span className="dot" style={{ background: COLORS[i % COLORS.length] || "#7C3AED" }} />
-            <input
-              type="text"
-              placeholder="https://www.santemagazine.fr/..."
-              value={url}
-              onChange={(e) => updateUrl(i, e.target.value)}
-            />
-            {urls.length > 1 && (
-              <button className="icon-btn" onClick={() => removeUrl(i)}>×</button>
-            )}
-          </div>
-        ))}
-        {urls.length < 5 && (
-          <button className="ghost-btn" onClick={addUrl}>+ Ajouter un article</button>
-        )}
-
-        <div className="date-row">
-          <label>Du <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} /></label>
-          <label>Au <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} /></label>
-        </div>
-
-        <button className="primary-btn" onClick={handleCompare} disabled={loading}>
-          {loading ? "Chargement..." : "Comparer"}
-        </button>
-
-        {error && <p className="error">{error}</p>}
-      </section>
-
-      {results.length > 0 && (
-        <>
-          <section className="panel">
-            <h2 className="panel-title">Performances</h2>
-            <table>
-              <thead>
-                <tr>
-                  <th>Article</th>
-                  <th className="num">Clics</th>
-                  <th className="num">Impressions</th>
-                  <th className="num">CTR</th>
-                  <th className="num">Position moy.</th>
-                </tr>
-              </thead>
-              <tbody>
-                {results.map((r, i) => (
-                  <tr key={i}>
-                    <td className="article-cell">
-                      <span className="dot" style={{ background: COLORS[i % COLORS.length] || "#7C3AED" }} />
-                      <span className="url-text">{r.url}</span>
-                    </td>
-                    <td className={`num ${winners.clicks === i ? "win" : ""}`}>{formatNumber(r.clicks)}</td>
-                    <td className={`num ${winners.impressions === i ? "win" : ""}`}>{formatNumber(r.impressions)}</td>
-                    <td className={`num ${winners.ctr === i ? "win" : ""}`}>{r.ctr.toFixed(2)}%</td>
-                    <td className={`num ${winners.position === i ? "win" : ""}`}>{r.position.toFixed(1)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </section>
-
-          {results.length === 2 && (
-            <section className="panel">
-              <h2 className="panel-title">Comparaison des mots-clés</h2>
-              <div className="metric-cards">
-                <div className="metric-card">
-                  <div className="metric-value">{overlapPercent}%</div>
-                  <div className="metric-label">Chevauchement de mots-clés</div>
-                  <div className="metric-desc">
-                    Part des requêtes principales que les deux articles ont en commun.
-                  </div>
-                </div>
-                <div className="metric-card">
-                  <div className="metric-value">{data.commonQueries.length}</div>
-                  <div className="metric-label">Requêtes communes</div>
-                  <div className="metric-desc">
-                    Sur les {results[0].topQueries.length + results[1].topQueries.length} requêtes principales analysées au total.
-                  </div>
-                </div>
-                <div className="metric-card">
-                  <div className="metric-value">
-                    {results[0].clicks > results[1].clicks ? "A" : "B"}
-                  </div>
-                  <div className="metric-label">Article le plus performant</div>
-                  <div className="metric-desc">
-                    Basé sur le nombre total de clics sur la période sélectionnée.
-                  </div>
-                </div>
-              </div>
-
-              <div className="queries-grid">
-                {results.map((r, i) => (
-                  <div className="query-box" key={i} style={{ borderColor: COLORS[i % COLORS.length] }}>
-                    <div className="query-box-title" style={{ color: COLORS[i % COLORS.length] }}>
-                      Top requêtes — Article {i === 0 ? "A" : "B"}
-                    </div>
-                    <ul>
-                      {r.topQueries.slice(0, 6).map((q, qi) => (
-                        <li key={qi}>
-                          {q.query} <span className="muted">({formatNumber(q.clicks)} clics)</span>
-                        </li>
-                      ))}
-                      {r.topQueries.length === 0 && <li className="muted">Aucune donnée</li>}
-                    </ul>
-                  </div>
-                ))}
-              </div>
-
-              {data.commonQueries.length > 0 && (
-                <div className="common-queries">
-                  <div className="common-title">Requêtes communes</div>
-                  <div className="chip-row">
-                    {data.commonQueries.map((q, i) => (
-                      <span className="chip" key={i}>{q}</span>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </section>
-          )}
-
-          {rec && (
-            <section className="panel recommendation">
-              <h2 className="panel-title">Recommandation</h2>
-
-              <div className="gauge-block">
-                <svg viewBox="0 0 300 170" className="gauge-svg">
-                  <path d="M30,150 A120,120 0 0,1 90,46.1" stroke="var(--accent)" strokeWidth="22" fill="none" strokeLinecap="round" />
-                  <path d="M90,46.1 A120,120 0 0,1 210,46.1" stroke="#0F9B8E" strokeWidth="22" fill="none" strokeLinecap="round" />
-                  <path d="M210,46.1 A120,120 0 0,1 270,150" stroke="var(--accent)" strokeWidth="22" fill="none" strokeLinecap="round" />
-                  <line x1="150" y1="150" x2={needleX} y2={needleY} stroke={VERDICT_COLOR[rec.verdict]} strokeWidth="4" strokeLinecap="round" />
-                  <circle cx="150" cy="150" r="9" fill={VERDICT_COLOR[rec.verdict]} />
-                </svg>
-                <div className="gauge-zone-labels">
-                  <span>Rediriger B → A</span>
-                  <span>Conserver</span>
-                  <span>Rediriger A → B</span>
-                </div>
-              </div>
-
-              <div className="rec-headline" style={{ color: VERDICT_COLOR[rec.verdict] }}>
-                {rec.headline}
-              </div>
-              <p className="rec-reason">{rec.reason}</p>
-
-              <details className="rec-details">
-                <summary>Voir le détail du calcul</summary>
-                <div className="rec-columns">
-                  <div>
-                    <div className="rec-subtitle">Signaux détectés</div>
-                    <ul className="rec-list">
-                      {rec.signals.map((s, i) => <li key={i}>{s}</li>)}
-                    </ul>
-                  </div>
-                  <div>
-                    <div className="rec-subtitle">Suggestions</div>
-                    <ul className="rec-list arrows">
-                      {rec.suggestions.map((s, i) => <li key={i}>{s}</li>)}
-                    </ul>
-                  </div>
-                </div>
-              </details>
-
-              <p className="rec-disclaimer">
-                Recommandation calculée automatiquement à partir des données Search Console (mots-clés et trafic). Elle ne remplace pas une lecture éditoriale des deux articles.
-              </p>
-            </section>
-          )}
-        </>
-      )}
-
-      <style jsx global>{`
-        :root {
-          --ink: #14213D;
-          --ink-soft: #5A6482;
-          --paper: #F1F0EC;
-          --paper-raised: #FFFFFF;
-          --line: #DDE0DA;
-          --accent: #C1440E;
-        }
-        * { box-sizing: border-box; }
-        body {
-          background: var(--paper);
-          color: var(--ink);
-          font-family: -apple-system, "Segoe UI", Inter, sans-serif;
-        }
-      `}</style>
-
-      <style jsx>{`
-        .wrap {
-          max-width: 980px;
-          margin: 0 auto;
-          padding: 32px 20px 80px;
-        }
-        .masthead {
-          display: flex;
-          justify-content: space-between;
-          align-items: flex-end;
-          border-bottom: 3px solid var(--ink);
-          padding-bottom: 16px;
-          margin-bottom: 24px;
-          flex-wrap: wrap;
-          gap: 8px;
-        }
-        .eyebrow {
-          font-size: 11px;
-          letter-spacing: 0.1em;
-          text-transform: uppercase;
-          color: var(--accent);
-          font-weight: 600;
-          margin-bottom: 4px;
-        }
-        .title { font-size: 28px; margin: 0; font-weight: 700; }
-        .meta { font-size: 12.5px; color: var(--ink-soft); }
-        .panel {
-          background: var(--paper-raised);
-          border: 1px solid var(--line);
-          border-radius: 10px;
-          padding: 22px;
-          margin-bottom: 20px;
-        }
-        .panel-title { font-size: 17px; margin: 0 0 16px; }
-        .controls h3 { margin-top: 0; font-size: 15px; }
-        .url-row { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
-        .dot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; }
-        .url-row input {
-          flex: 1; padding: 9px 10px; border: 1px solid var(--line);
-          border-radius: 6px; font-size: 13.5px;
-        }
-        .icon-btn {
-          border: 1px solid var(--line); background: var(--paper); border-radius: 6px;
-          width: 30px; height: 30px; cursor: pointer; font-size: 15px; color: var(--ink-soft);
-        }
-        .ghost-btn {
-          border: 1px dashed var(--line); background: none; border-radius: 20px;
-          padding: 6px 14px; font-size: 12.5px; color: var(--ink-soft); cursor: pointer; margin-top: 4px;
-        }
-        .date-row { display: flex; gap: 16px; margin: 16px 0; font-size: 13px; flex-wrap: wrap; }
-        .date-row input { margin-left: 6px; padding: 5px 8px; border: 1px solid var(--line); border-radius: 6px; }
-        .primary-btn {
-          background: var(--ink); color: white; border: none; padding: 11px 22px;
-          border-radius: 7px; cursor: pointer; font-size: 14px; font-weight: 600;
-        }
-        .primary-btn:disabled { opacity: 0.6; cursor: default; }
-        .error { color: var(--accent); font-size: 13px; }
-
-        table { width: 100%; border-collapse: collapse; }
-        thead th {
-          text-align: left; font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em;
-          color: var(--ink-soft); padding: 0 10px 10px; border-bottom: 2px solid var(--ink);
-        }
-        thead th.num, td.num { text-align: right; }
-        tbody td { padding: 12px 10px; border-bottom: 1px solid var(--line); font-size: 13.5px; }
-        .article-cell { display: flex; align-items: center; gap: 8px; max-width: 340px; }
-        .url-text { font-size: 12px; word-break: break-all; color: var(--ink-soft); }
-        td.win { font-weight: 700; color: #0F9B8E; }
-
-        .metric-cards {
-          display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-          gap: 14px; margin-bottom: 20px;
-        }
-        .metric-card { border: 1px solid var(--line); border-radius: 10px; padding: 16px; text-align: center; }
-        .metric-value { font-size: 30px; font-weight: 700; color: var(--ink); }
-        .metric-label { font-size: 12.5px; font-weight: 600; margin-top: 4px; }
-        .metric-desc { font-size: 11.5px; color: var(--ink-soft); margin-top: 6px; line-height: 1.4; }
-
-        .queries-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 16px; }
-        .query-box { border: 1px solid var(--line); border-left-width: 3px; border-radius: 8px; padding: 14px; }
-        .query-box-title { font-size: 12px; font-weight: 700; margin-bottom: 8px; }
-        .query-box ul { margin: 0; padding-left: 18px; font-size: 12.5px; }
-        .query-box li { margin-bottom: 3px; }
-        .muted { color: var(--ink-soft); }
-
-        .common-queries { border-top: 1px solid var(--line); padding-top: 14px; }
-        .common-title { font-size: 12.5px; font-weight: 600; margin-bottom: 8px; }
-        .chip-row { display: flex; flex-wrap: wrap; gap: 6px; }
-        .chip { background: #F4E1D8; color: var(--accent); padding: 4px 10px; border-radius: 14px; font-size: 12px; }
-
-        .gauge-block { display: flex; flex-direction: column; align-items: center; margin-bottom: 14px; }
-        .gauge-svg { width: 260px; height: auto; }
-        .gauge-zone-labels {
-          display: flex; justify-content: space-between; width: 250px;
-          font-size: 10.5px; color: var(--ink-soft); margin-top: -8px;
-        }
-
-        .rec-headline { font-size: 21px; font-weight: 700; text-align: center; margin-bottom: 6px; }
-        .rec-reason { font-size: 14px; color: var(--ink-soft); line-height: 1.5; text-align: center; max-width: 560px; margin: 0 auto 14px; }
-
-        .rec-details { margin: 14px 0 4px; }
-        .rec-details summary {
-          cursor: pointer; font-size: 12.5px; color: var(--ink-soft); font-weight: 600;
-        }
-        .rec-details[open] summary { margin-bottom: 14px; }
-        .rec-columns { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
-        .rec-subtitle {
-          font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em;
-          font-weight: 700; color: var(--ink-soft); margin-bottom: 8px;
-        }
-        .rec-list { margin: 0; padding-left: 18px; font-size: 13px; line-height: 1.6; }
-        .rec-list.arrows { list-style: none; padding-left: 0; }
-        .rec-list.arrows li::before { content: "→ "; color: var(--accent); font-weight: 700; }
-        .rec-disclaimer {
-          font-size: 11px; color: var(--ink-soft); border-top: 1px solid var(--line);
-          padding-top: 12px; margin: 14px 0 0;
-        }
-
-        @media (max-width: 640px) {
-          .queries-grid, .rec-columns { grid-template-columns: 1fr; }
-        }
-      `}</style>
-    </main>
-  );
-}
+          <div
