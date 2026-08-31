@@ -97,6 +97,15 @@ export default function Home() {
     ? Math.round(((data?.commonQueries.length || 0) / smallerQueryCount) * 100)
     : 0;
 
+  let needleX = 150;
+  let needleY = 55;
+  if (rec) {
+    const angleDeg = 180 - (rec.balance / 100) * 180;
+    const angleRad = (angleDeg * Math.PI) / 180;
+    needleX = 150 + 95 * Math.cos(angleRad);
+    needleY = 150 - 95 * Math.sin(angleRad);
+  }
+
   return (
     <main className="wrap">
       <header className="masthead">
@@ -234,16 +243,17 @@ export default function Home() {
             <section className="panel recommendation">
               <h2 className="panel-title">Recommandation</h2>
 
-              <div className="gauge-wrap">
-                <div className="gauge-track">
-                  <div className="gauge-zone" style={{ left: 0, width: "33%" }} />
-                  <div className="gauge-zone" style={{ left: "33%", width: "34%" }} />
-                  <div className="gauge-zone" style={{ left: "67%", width: "33%" }} />
-                  <div className="gauge-marker" style={{ left: `${rec.balance}%`, background: VERDICT_COLOR[rec.verdict] }} />
-                </div>
-                <div className="gauge-labels">
+              <div className="gauge-block">
+                <svg viewBox="0 0 300 170" className="gauge-svg">
+                  <path d="M30,150 A120,120 0 0,1 90,46.1" stroke="var(--accent)" strokeWidth="22" fill="none" strokeLinecap="round" />
+                  <path d="M90,46.1 A120,120 0 0,1 210,46.1" stroke="#0F9B8E" strokeWidth="22" fill="none" strokeLinecap="round" />
+                  <path d="M210,46.1 A120,120 0 0,1 270,150" stroke="var(--accent)" strokeWidth="22" fill="none" strokeLinecap="round" />
+                  <line x1="150" y1="150" x2={needleX} y2={needleY} stroke={VERDICT_COLOR[rec.verdict]} strokeWidth="4" strokeLinecap="round" />
+                  <circle cx="150" cy="150" r="9" fill={VERDICT_COLOR[rec.verdict]} />
+                </svg>
+                <div className="gauge-zone-labels">
                   <span>Rediriger B → A</span>
-                  <span>Conserver les deux</span>
+                  <span>Conserver</span>
                   <span>Rediriger A → B</span>
                 </div>
               </div>
@@ -253,20 +263,23 @@ export default function Home() {
               </div>
               <p className="rec-reason">{rec.reason}</p>
 
-              <div className="rec-columns">
-                <div>
-                  <div className="rec-subtitle">Signaux détectés</div>
-                  <ul className="rec-list">
-                    {rec.signals.map((s, i) => <li key={i}>{s}</li>)}
-                  </ul>
+              <details className="rec-details">
+                <summary>Voir le détail du calcul</summary>
+                <div className="rec-columns">
+                  <div>
+                    <div className="rec-subtitle">Signaux détectés</div>
+                    <ul className="rec-list">
+                      {rec.signals.map((s, i) => <li key={i}>{s}</li>)}
+                    </ul>
+                  </div>
+                  <div>
+                    <div className="rec-subtitle">Suggestions</div>
+                    <ul className="rec-list arrows">
+                      {rec.suggestions.map((s, i) => <li key={i}>{s}</li>)}
+                    </ul>
+                  </div>
                 </div>
-                <div>
-                  <div className="rec-subtitle">Suggestions</div>
-                  <ul className="rec-list arrows">
-                    {rec.suggestions.map((s, i) => <li key={i}>{s}</li>)}
-                  </ul>
-                </div>
-              </div>
+              </details>
 
               <p className="rec-disclaimer">
                 Recommandation calculée automatiquement à partir des données Search Console (mots-clés et trafic). Elle ne remplace pas une lecture éditoriale des deux articles.
@@ -317,15 +330,8 @@ export default function Home() {
           font-weight: 600;
           margin-bottom: 4px;
         }
-        .title {
-          font-size: 28px;
-          margin: 0;
-          font-weight: 700;
-        }
-        .meta {
-          font-size: 12.5px;
-          color: var(--ink-soft);
-        }
+        .title { font-size: 28px; margin: 0; font-weight: 700; }
+        .meta { font-size: 12.5px; color: var(--ink-soft); }
         .panel {
           background: var(--paper-raised);
           border: 1px solid var(--line);
@@ -333,147 +339,54 @@ export default function Home() {
           padding: 22px;
           margin-bottom: 20px;
         }
-        .panel-title {
-          font-size: 17px;
-          margin: 0 0 16px;
-        }
+        .panel-title { font-size: 17px; margin: 0 0 16px; }
         .controls h3 { margin-top: 0; font-size: 15px; }
-        .url-row {
-          display: flex;
-          align-items: center;
-          gap: 8px;
-          margin-bottom: 8px;
-        }
-        .dot {
-          width: 9px;
-          height: 9px;
-          border-radius: 50%;
-          flex-shrink: 0;
-        }
+        .url-row { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+        .dot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; }
         .url-row input {
-          flex: 1;
-          padding: 9px 10px;
-          border: 1px solid var(--line);
-          border-radius: 6px;
-          font-size: 13.5px;
+          flex: 1; padding: 9px 10px; border: 1px solid var(--line);
+          border-radius: 6px; font-size: 13.5px;
         }
         .icon-btn {
-          border: 1px solid var(--line);
-          background: var(--paper);
-          border-radius: 6px;
-          width: 30px;
-          height: 30px;
-          cursor: pointer;
-          font-size: 15px;
-          color: var(--ink-soft);
+          border: 1px solid var(--line); background: var(--paper); border-radius: 6px;
+          width: 30px; height: 30px; cursor: pointer; font-size: 15px; color: var(--ink-soft);
         }
         .ghost-btn {
-          border: 1px dashed var(--line);
-          background: none;
-          border-radius: 20px;
-          padding: 6px 14px;
-          font-size: 12.5px;
-          color: var(--ink-soft);
-          cursor: pointer;
-          margin-top: 4px;
+          border: 1px dashed var(--line); background: none; border-radius: 20px;
+          padding: 6px 14px; font-size: 12.5px; color: var(--ink-soft); cursor: pointer; margin-top: 4px;
         }
-        .date-row {
-          display: flex;
-          gap: 16px;
-          margin: 16px 0;
-          font-size: 13px;
-          flex-wrap: wrap;
-        }
-        .date-row input {
-          margin-left: 6px;
-          padding: 5px 8px;
-          border: 1px solid var(--line);
-          border-radius: 6px;
-        }
+        .date-row { display: flex; gap: 16px; margin: 16px 0; font-size: 13px; flex-wrap: wrap; }
+        .date-row input { margin-left: 6px; padding: 5px 8px; border: 1px solid var(--line); border-radius: 6px; }
         .primary-btn {
-          background: var(--ink);
-          color: white;
-          border: none;
-          padding: 11px 22px;
-          border-radius: 7px;
-          cursor: pointer;
-          font-size: 14px;
-          font-weight: 600;
+          background: var(--ink); color: white; border: none; padding: 11px 22px;
+          border-radius: 7px; cursor: pointer; font-size: 14px; font-weight: 600;
         }
         .primary-btn:disabled { opacity: 0.6; cursor: default; }
         .error { color: var(--accent); font-size: 13px; }
 
         table { width: 100%; border-collapse: collapse; }
         thead th {
-          text-align: left;
-          font-size: 11px;
-          text-transform: uppercase;
-          letter-spacing: 0.05em;
-          color: var(--ink-soft);
-          padding: 0 10px 10px;
-          border-bottom: 2px solid var(--ink);
+          text-align: left; font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em;
+          color: var(--ink-soft); padding: 0 10px 10px; border-bottom: 2px solid var(--ink);
         }
         thead th.num, td.num { text-align: right; }
-        tbody td {
-          padding: 12px 10px;
-          border-bottom: 1px solid var(--line);
-          font-size: 13.5px;
-        }
-        .article-cell {
-          display: flex;
-          align-items: center;
-          gap: 8px;
-          max-width: 340px;
-        }
+        tbody td { padding: 12px 10px; border-bottom: 1px solid var(--line); font-size: 13.5px; }
+        .article-cell { display: flex; align-items: center; gap: 8px; max-width: 340px; }
         .url-text { font-size: 12px; word-break: break-all; color: var(--ink-soft); }
         td.win { font-weight: 700; color: #0F9B8E; }
 
         .metric-cards {
-          display: grid;
-          grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-          gap: 14px;
-          margin-bottom: 20px;
+          display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+          gap: 14px; margin-bottom: 20px;
         }
-        .metric-card {
-          border: 1px solid var(--line);
-          border-radius: 10px;
-          padding: 16px;
-          text-align: center;
-        }
-        .metric-value {
-          font-size: 30px;
-          font-weight: 700;
-          color: var(--ink);
-        }
-        .metric-label {
-          font-size: 12.5px;
-          font-weight: 600;
-          margin-top: 4px;
-        }
-        .metric-desc {
-          font-size: 11.5px;
-          color: var(--ink-soft);
-          margin-top: 6px;
-          line-height: 1.4;
-        }
+        .metric-card { border: 1px solid var(--line); border-radius: 10px; padding: 16px; text-align: center; }
+        .metric-value { font-size: 30px; font-weight: 700; color: var(--ink); }
+        .metric-label { font-size: 12.5px; font-weight: 600; margin-top: 4px; }
+        .metric-desc { font-size: 11.5px; color: var(--ink-soft); margin-top: 6px; line-height: 1.4; }
 
-        .queries-grid {
-          display: grid;
-          grid-template-columns: 1fr 1fr;
-          gap: 14px;
-          margin-bottom: 16px;
-        }
-        .query-box {
-          border: 1px solid var(--line);
-          border-left-width: 3px;
-          border-radius: 8px;
-          padding: 14px;
-        }
-        .query-box-title {
-          font-size: 12px;
-          font-weight: 700;
-          margin-bottom: 8px;
-        }
+        .queries-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 16px; }
+        .query-box { border: 1px solid var(--line); border-left-width: 3px; border-radius: 8px; padding: 14px; }
+        .query-box-title { font-size: 12px; font-weight: 700; margin-bottom: 8px; }
         .query-box ul { margin: 0; padding-left: 18px; font-size: 12.5px; }
         .query-box li { margin-bottom: 3px; }
         .muted { color: var(--ink-soft); }
@@ -481,81 +394,34 @@ export default function Home() {
         .common-queries { border-top: 1px solid var(--line); padding-top: 14px; }
         .common-title { font-size: 12.5px; font-weight: 600; margin-bottom: 8px; }
         .chip-row { display: flex; flex-wrap: wrap; gap: 6px; }
-        .chip {
-          background: #F4E1D8;
-          color: var(--accent);
-          padding: 4px 10px;
-          border-radius: 14px;
-          font-size: 12px;
+        .chip { background: #F4E1D8; color: var(--accent); padding: 4px 10px; border-radius: 14px; font-size: 12px; }
+
+        .gauge-block { display: flex; flex-direction: column; align-items: center; margin-bottom: 14px; }
+        .gauge-svg { width: 260px; height: auto; }
+        .gauge-zone-labels {
+          display: flex; justify-content: space-between; width: 250px;
+          font-size: 10.5px; color: var(--ink-soft); margin-top: -8px;
         }
 
-        .gauge-wrap { margin-bottom: 22px; }
-        .gauge-track {
-          position: relative;
-          height: 10px;
-          border-radius: 6px;
-          background: var(--paper);
-          border: 1px solid var(--line);
-          overflow: visible;
-        }
-        .gauge-zone {
-          position: absolute;
-          top: 0;
-          bottom: 0;
-        }
-        .gauge-marker {
-          position: absolute;
-          top: 50%;
-          width: 16px;
-          height: 16px;
-          border-radius: 50%;
-          transform: translate(-50%, -50%);
-          border: 3px solid white;
-          box-shadow: 0 0 0 1px var(--line);
-          transition: left 0.4s ease;
-        }
-        .gauge-labels {
-          display: flex;
-          justify-content: space-between;
-          font-size: 11px;
-          color: var(--ink-soft);
-          margin-top: 8px;
-        }
+        .rec-headline { font-size: 21px; font-weight: 700; text-align: center; margin-bottom: 6px; }
+        .rec-reason { font-size: 14px; color: var(--ink-soft); line-height: 1.5; text-align: center; max-width: 560px; margin: 0 auto 14px; }
 
-        .rec-headline {
-          font-size: 20px;
-          font-weight: 700;
-          margin-bottom: 8px;
+        .rec-details { margin: 14px 0 4px; }
+        .rec-details summary {
+          cursor: pointer; font-size: 12.5px; color: var(--ink-soft); font-weight: 600;
         }
-        .rec-reason {
-          font-size: 14px;
-          color: var(--ink-soft);
-          line-height: 1.5;
-          margin-bottom: 18px;
-        }
-        .rec-columns {
-          display: grid;
-          grid-template-columns: 1fr 1fr;
-          gap: 20px;
-          margin-bottom: 16px;
-        }
+        .rec-details[open] summary { margin-bottom: 14px; }
+        .rec-columns { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
         .rec-subtitle {
-          font-size: 12px;
-          text-transform: uppercase;
-          letter-spacing: 0.05em;
-          font-weight: 700;
-          color: var(--ink-soft);
-          margin-bottom: 8px;
+          font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em;
+          font-weight: 700; color: var(--ink-soft); margin-bottom: 8px;
         }
         .rec-list { margin: 0; padding-left: 18px; font-size: 13px; line-height: 1.6; }
         .rec-list.arrows { list-style: none; padding-left: 0; }
         .rec-list.arrows li::before { content: "→ "; color: var(--accent); font-weight: 700; }
         .rec-disclaimer {
-          font-size: 11px;
-          color: var(--ink-soft);
-          border-top: 1px solid var(--line);
-          padding-top: 12px;
-          margin: 0;
+          font-size: 11px; color: var(--ink-soft); border-top: 1px solid var(--line);
+          padding-top: 12px; margin: 14px 0 0;
         }
 
         @media (max-width: 640px) {
