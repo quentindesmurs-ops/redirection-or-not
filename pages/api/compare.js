@@ -164,7 +164,7 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: "Méthode non autorisée" });
   }
 
-  const { urls, startDate, endDate, dates } = req.body;
+  const { urls, startDate, endDate } = req.body;
 
   if (!urls || !Array.isArray(urls) || urls.length === 0) {
     return res.status(400).json({ error: "Aucune URL fournie" });
@@ -180,13 +180,12 @@ export default async function handler(req, res) {
     const searchconsole = getClient();
 
     const results = await Promise.all(
-      urls.map(async (rawUrl, index) => {
+      urls.map(async (rawUrl) => {
         const url = rawUrl.trim();
-        const providedDate = dates && dates[index] ? dates[index] : null;
         const [totals, topQueries, publishedDate] = await Promise.all([
           fetchTotals(searchconsole, siteUrl, url, startDate, endDate),
           fetchTopQueries(searchconsole, siteUrl, url, startDate, endDate),
-          providedDate ? Promise.resolve(providedDate) : fetchPublishedDate(url),
+          fetchPublishedDate(url),
         ]);
         return { url, ...totals, topQueries, publishedDate };
       })
