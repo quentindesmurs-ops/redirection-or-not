@@ -98,13 +98,11 @@ function RecommendationRing({ rec }) {
 
 export default function Home() {
   const [urls, setUrls] = useState(["", ""]);
-  const [manualDates, setManualDates] = useState(["", ""]);
   const [startDate, setStartDate] = useState(defaultStart());
   const [endDate, setEndDate] = useState(defaultEnd());
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const [activeTab, setActiveTab] = useState("rec");
 
   function updateUrl(index, value) {
     const next = [...urls];
@@ -112,22 +110,12 @@ export default function Home() {
     setUrls(next);
   }
 
-  function updateDate(index, value) {
-    const next = [...manualDates];
-    next[index] = value;
-    setManualDates(next);
-  }
-
   function addUrl() {
-    if (urls.length < 5) {
-      setUrls([...urls, ""]);
-      setManualDates([...manualDates, ""]);
-    }
+    if (urls.length < 5) setUrls([...urls, ""]);
   }
 
   function removeUrl(index) {
     setUrls(urls.filter((_, i) => i !== index));
-    setManualDates(manualDates.filter((_, i) => i !== index));
   }
 
   async function handleCompare() {
@@ -143,12 +131,11 @@ export default function Home() {
       const res = await fetch("/api/compare", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ urls: cleanUrls, startDate, endDate, dates: manualDates }),
+        body: JSON.stringify({ urls: cleanUrls, startDate, endDate }),
       });
       const json = await res.json();
       if (!res.ok) throw new Error(json.error || "Erreur inconnue");
       setData(json);
-      setActiveTab("rec");
     } catch (e) {
       setError(e.message);
     } finally {
@@ -210,13 +197,6 @@ export default function Home() {
               value={url}
               onChange={(e) => updateUrl(i, e.target.value)}
             />
-            <input
-              type="date"
-              className="date-input"
-              value={manualDates[i] || ""}
-              onChange={(e) => updateDate(i, e.target.value)}
-              title="Date de publication (laisser vide pour détection automatique)"
-            />
             {urls.length > 1 && (
               <button className="icon-btn" onClick={() => removeUrl(i)}>×</button>
             )}
@@ -225,7 +205,7 @@ export default function Home() {
         {urls.length < 5 && (
           <button className="ghost-btn" onClick={addUrl}>+ Ajouter un article</button>
         )}
-        <p className="hint">📅 Laisse la date vide pour une détection automatique sur la page de l'article.</p>
+        <p className="hint">📅 La date de publication de chaque article est détectée automatiquement.</p>
 
         <div className="date-row">
           <label>Du <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} /></label>
@@ -241,110 +221,39 @@ export default function Home() {
 
       {results.length > 0 && (
         <>
-          <div className="tabs">
-            {rec && (
-              <div className={`tab ${activeTab === "rec" ? "active" : ""}`} onClick={() => setActiveTab("rec")}>
-                ✅ Recommandation
-              </div>
-            )}
-            <div className={`tab ${activeTab === "perf" ? "active" : ""}`} onClick={() => setActiveTab("perf")}>
-              📊 Performances
-            </div>
-            {isPair && (
-              <div className={`tab ${activeTab === "kw" ? "active" : ""}`} onClick={() => setActiveTab("kw")}>
-                🔍 Mots-clés
-              </div>
-            )}
-          </div>
-
-          {rec && activeTab === "rec" && (
-            <section className="panel">
-              <div className="rec-body">
-                <RecommendationRing rec={rec} />
-
-                <div className="rec-headline" style={{ color: VERDICT_COLOR[rec.verdict] }}>
-                  {rec.headline}
-                </div>
-
-                <div className="age-pills">
-                  {results.map((r, i) => (
-                    <span className="age-pill" key={i} style={{ background: `${BADGE_COLORS[i % BADGE_COLORS.length]}1A`, color: BADGE_COLORS[i % BADGE_COLORS.length] }}>
-                      {LETTERS[i]} — {ageLabel(r.publishedDate)}
-                    </span>
-                  ))}
-                </div>
-
-                <p className="rec-reason">{rec.reason}</p>
-
-                {isPair && atRiskTotal > 0 && (
-                  <div className="risk-box">
-                    <div className="risk-title">⚠️ Trafic potentiellement à risque</div>
-                    <div className="risk-value">
-                      {atRiskTotal} clics de l'article {LETTERS[loserIdx]} sur des requêtes absentes du top de l'article {LETTERS[winnerIdx]} — à surveiller en cas de redirection.
-                    </div>
-                    <div className="risk-link" onClick={() => setActiveTab("kw")}>
-                      Voir le détail requête par requête →
-                    </div>
-                  </div>
-                )}
-
-                <div className="rec-signals">
-                  {rec.signals.map((s, i) => (
-                    <div className="signal-row" key={i}>
-                      <span className="signal-check" style={{ background: VERDICT_COLOR[rec.verdict] }}>✓</span>
-                      {s}
-                    </div>
-                  ))}
-                </div>
-
-                <details className="rec-details">
-                  <summary>Voir les actions recommandées</summary>
-                  <ul className="rec-list arrows">
-                    {rec.suggestions.map((s, i) => <li key={i}>{s}</li>)}
-                  </ul>
-                </details>
-              </div>
-
-              <p className="rec-disclaimer">
-                Recommandation calculée automatiquement à partir des données Search Console (mots-clés et trafic). Elle ne remplace pas une lecture éditoriale des deux articles.
-              </p>
-            </section>
-          )}
-
-          {activeTab === "perf" && (
-            <section className="panel">
-              <table>
-                <thead>
-                  <tr>
-                    <th>Article</th>
-                    <th className="num">Clics</th>
-                    <th className="num">Impressions</th>
-                    <th className="num">CTR</th>
-                    <th className="num">Position moy.</th>
+          <section className="panel">
+            <h2 className="panel-title">Performances</h2>
+            <table>
+              <thead>
+                <tr>
+                  <th>Article</th>
+                  <th className="num">Clics</th>
+                  <th className="num">Impressions</th>
+                  <th className="num">CTR</th>
+                  <th className="num">Position moy.</th>
+                </tr>
+              </thead>
+              <tbody>
+                {results.map((r, i) => (
+                  <tr key={i}>
+                    <td className="article-cell">
+                      <span className="badge small" style={{ background: BADGE_COLORS[i % BADGE_COLORS.length] }}>{LETTERS[i]}</span>
+                      <div>
+                        <div className="url-text">{r.url}</div>
+                        <div className="age-text">{ageLabel(r.publishedDate)}</div>
+                      </div>
+                    </td>
+                    <td className={`num ${winners.clicks === i ? "win" : ""}`}>{formatNumber(r.clicks)}</td>
+                    <td className={`num ${winners.impressions === i ? "win" : ""}`}>{formatNumber(r.impressions)}</td>
+                    <td className={`num ${winners.ctr === i ? "win" : ""}`}>{r.ctr.toFixed(2)}%</td>
+                    <td className={`num ${winners.position === i ? "win" : ""}`}>{r.position.toFixed(1)}</td>
                   </tr>
-                </thead>
-                <tbody>
-                  {results.map((r, i) => (
-                    <tr key={i}>
-                      <td className="article-cell">
-                        <span className="badge small" style={{ background: BADGE_COLORS[i % BADGE_COLORS.length] }}>{LETTERS[i]}</span>
-                        <div>
-                          <div className="url-text">{r.url}</div>
-                          <div className="age-text">{ageLabel(r.publishedDate)}</div>
-                        </div>
-                      </td>
-                      <td className={`num ${winners.clicks === i ? "win" : ""}`}>{formatNumber(r.clicks)}</td>
-                      <td className={`num ${winners.impressions === i ? "win" : ""}`}>{formatNumber(r.impressions)}</td>
-                      <td className={`num ${winners.ctr === i ? "win" : ""}`}>{r.ctr.toFixed(2)}%</td>
-                      <td className={`num ${winners.position === i ? "win" : ""}`}>{r.position.toFixed(1)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </section>
-          )}
+                ))}
+              </tbody>
+            </table>
+          </section>
 
-          {isPair && activeTab === "kw" && (
+          {isPair && (
             <section className="panel">
               <h2 className="panel-title">Comparaison des mots-clés</h2>
               <div className="metric-cards">
@@ -427,6 +336,50 @@ export default function Home() {
               </div>
             </section>
           )}
+
+          {rec && (
+            <section className="panel recommendation">
+              <h2 className="panel-title">Recommandation</h2>
+
+              <div className="rec-body">
+                <RecommendationRing rec={rec} />
+
+                <div className="rec-headline" style={{ color: VERDICT_COLOR[rec.verdict] }}>
+                  {rec.headline}
+                </div>
+
+                <div className="age-pills">
+                  {results.map((r, i) => (
+                    <span className="age-pill" key={i} style={{ background: `${BADGE_COLORS[i % BADGE_COLORS.length]}1A`, color: BADGE_COLORS[i % BADGE_COLORS.length] }}>
+                      {LETTERS[i]} — {ageLabel(r.publishedDate)}
+                    </span>
+                  ))}
+                </div>
+
+                <p className="rec-reason">{rec.reason}</p>
+
+                <div className="rec-signals">
+                  {rec.signals.map((s, i) => (
+                    <div className="signal-row" key={i}>
+                      <span className="signal-check" style={{ background: VERDICT_COLOR[rec.verdict] }}>✓</span>
+                      {s}
+                    </div>
+                  ))}
+                </div>
+
+                <details className="rec-details">
+                  <summary>Voir les actions recommandées</summary>
+                  <ul className="rec-list arrows">
+                    {rec.suggestions.map((s, i) => <li key={i}>{s}</li>)}
+                  </ul>
+                </details>
+              </div>
+
+              <p className="rec-disclaimer">
+                Recommandation calculée automatiquement à partir des données Search Console (mots-clés et trafic). Elle ne remplace pas une lecture éditoriale des deux articles.
+              </p>
+            </section>
+          )}
         </>
       )}
 
@@ -479,7 +432,6 @@ export default function Home() {
           flex: 1; padding: 9px 10px; border: 1px solid var(--line);
           border-radius: 6px; font-size: 13.5px;
         }
-        .date-input { width: 145px; padding: 9px 8px; border: 1px solid var(--line); border-radius: 6px; font-size: 12.5px; }
         .icon-btn {
           border: 1px solid var(--line); background: var(--paper); border-radius: 6px;
           width: 30px; height: 30px; cursor: pointer; font-size: 15px; color: var(--ink-soft);
@@ -498,16 +450,6 @@ export default function Home() {
         .primary-btn:disabled { opacity: 0.6; cursor: default; }
         .error { color: var(--accent); font-size: 13px; }
 
-        .tabs {
-          display: flex; gap: 4px; background: var(--paper); border: 1px solid var(--line);
-          border-radius: 9px; padding: 4px; margin-bottom: 16px;
-        }
-        .tab {
-          flex: 1; text-align: center; padding: 9px 8px; font-size: 12.5px; font-weight: 700;
-          border-radius: 6px; cursor: pointer; color: var(--ink-soft);
-        }
-        .tab.active { background: var(--ink); color: white; }
-
         table { width: 100%; border-collapse: collapse; }
         thead th {
           text-align: left; font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em;
@@ -519,40 +461,6 @@ export default function Home() {
         .url-text { font-size: 12px; word-break: break-all; color: var(--ink-soft); }
         .age-text { font-size: 11px; color: var(--accent); font-weight: 600; margin-top: 2px; }
         td.win { font-weight: 700; color: var(--teal); }
-
-        .rec-body { display: flex; flex-direction: column; align-items: center; gap: 12px; }
-        .rec-headline { font-size: 20px; font-weight: 700; text-align: center; }
-        .age-pills { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; }
-        .age-pill { font-size: 11.5px; font-weight: 600; padding: 4px 11px; border-radius: 14px; }
-        .rec-reason {
-          font-size: 13.5px; color: var(--ink-soft); line-height: 1.5; text-align: center;
-          max-width: 460px; margin: 0;
-        }
-
-        .risk-box {
-          background: #FDEDEA; border: 1px solid #F1C6B4; border-radius: 8px;
-          padding: 14px 16px; margin-top: 4px; text-align: left; width: 100%;
-        }
-        .risk-title { font-size: 13px; font-weight: 700; color: var(--accent); margin-bottom: 4px; }
-        .risk-value { font-size: 12.5px; color: var(--ink-soft); }
-        .risk-link { font-size: 12px; font-weight: 700; color: var(--accent); margin-top: 8px; cursor: pointer; text-decoration: underline; }
-
-        .rec-signals { display: flex; flex-direction: column; gap: 9px; align-self: flex-start; margin-top: 6px; padding-left: 4px; }
-        .signal-row { display: flex; align-items: center; gap: 9px; font-size: 13.5px; font-weight: 600; color: var(--ink); }
-        .signal-check {
-          width: 18px; height: 18px; border-radius: 50%; color: white;
-          display: flex; align-items: center; justify-content: center; font-size: 11px; flex-shrink: 0;
-        }
-        .rec-details { margin-top: 6px; align-self: flex-start; }
-        .rec-details summary { cursor: pointer; font-size: 12.5px; color: var(--ink-soft); font-weight: 600; }
-        .rec-details[open] summary { margin-bottom: 10px; }
-        .rec-list { margin: 0; padding-left: 18px; font-size: 13px; line-height: 1.6; }
-        .rec-list.arrows { list-style: none; padding-left: 0; }
-        .rec-list.arrows li::before { content: "→ "; color: var(--accent); font-weight: 700; }
-        .rec-disclaimer {
-          font-size: 11px; color: var(--ink-soft); border-top: 1px solid var(--line);
-          padding-top: 12px; margin: 18px 0 0;
-        }
 
         .metric-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 14px; margin-bottom: 20px; }
         .metric-card { border: 1px solid var(--line); border-radius: 10px; padding: 16px; text-align: center; }
@@ -574,7 +482,7 @@ export default function Home() {
         .risk-section { border-top: 1px solid var(--line); padding-top: 18px; }
         .risk-heading { font-size: 14.5px; margin: 0 0 4px; }
         .risk-intro { font-size: 12px; color: var(--ink-soft); margin: 0 0 12px; }
-        td.at-risk, th.at-risk { color: var(--accent); font-weight: 700; }
+        td.at-risk { color: var(--accent); font-weight: 700; }
         td.ok { color: var(--teal); font-weight: 700; }
         .risk-total {
           margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--line);
@@ -583,9 +491,33 @@ export default function Home() {
         .risk-total span:first-child { font-size: 13px; font-weight: 700; }
         .risk-total-value { font-size: 20px; font-weight: 800; color: var(--accent); }
 
+        .rec-body { display: flex; flex-direction: column; align-items: center; gap: 12px; }
+        .rec-headline { font-size: 20px; font-weight: 700; text-align: center; }
+        .age-pills { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; }
+        .age-pill { font-size: 11.5px; font-weight: 600; padding: 4px 11px; border-radius: 14px; }
+        .rec-reason {
+          font-size: 13.5px; color: var(--ink-soft); line-height: 1.5; text-align: center;
+          max-width: 460px; margin: 0;
+        }
+        .rec-signals { display: flex; flex-direction: column; gap: 9px; align-self: flex-start; margin-top: 6px; padding-left: 4px; }
+        .signal-row { display: flex; align-items: center; gap: 9px; font-size: 13.5px; font-weight: 600; color: var(--ink); }
+        .signal-check {
+          width: 18px; height: 18px; border-radius: 50%; color: white;
+          display: flex; align-items: center; justify-content: center; font-size: 11px; flex-shrink: 0;
+        }
+        .rec-details { margin-top: 6px; align-self: flex-start; }
+        .rec-details summary { cursor: pointer; font-size: 12.5px; color: var(--ink-soft); font-weight: 600; }
+        .rec-details[open] summary { margin-bottom: 10px; }
+        .rec-list { margin: 0; padding-left: 18px; font-size: 13px; line-height: 1.6; }
+        .rec-list.arrows { list-style: none; padding-left: 0; }
+        .rec-list.arrows li::before { content: "→ "; color: var(--accent); font-weight: 700; }
+        .rec-disclaimer {
+          font-size: 11px; color: var(--ink-soft); border-top: 1px solid var(--line);
+          padding-top: 12px; margin: 18px 0 0;
+        }
+
         @media (max-width: 640px) {
           .queries-grid { grid-template-columns: 1fr; }
-          .url-row { flex-wrap: wrap; }
         }
       `}</style>
     </main>
