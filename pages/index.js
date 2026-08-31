@@ -65,7 +65,7 @@ function RecommendationRing({ rec }) {
   const direction = rec.verdict === "redirect" && rec.loserLabel === "B" ? "left" : "right";
 
   return (
-    <div className="ring-wrap">
+    <div style={{ position: "relative", width: 120, height: 120 }}>
       <svg width="120" height="120" viewBox="0 0 220 220">
         <circle cx="110" cy="110" r={R} fill="none" stroke="#E7E5DF" strokeWidth="16" />
         <circle
@@ -75,7 +75,7 @@ function RecommendationRing({ rec }) {
           transform="rotate(-90 110 110)"
         />
       </svg>
-      <div className="ring-icon">
+      <div style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>
         <VerdictIcon verdict={rec.verdict} direction={direction} />
       </div>
     </div>
@@ -409,10 +409,6 @@ export default function Home() {
         .chip { background: #F4E1D8; color: var(--accent); padding: 4px 10px; border-radius: 14px; font-size: 12px; }
 
         .rec-body { display: flex; flex-direction: column; align-items: center; gap: 14px; }
-        .ring-wrap { position: relative; width: 120px; height: 120px; }
-        .ring-icon {
-          position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
-        }
         .rec-headline { font-size: 20px; font-weight: 700; text-align: center; }
         .rec-reason {
           font-size: 13.5px; color: var(--ink-soft); line-height: 1.5; text-align: center;
