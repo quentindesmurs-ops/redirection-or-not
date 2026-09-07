@@ -87,12 +87,46 @@ function clamp(n, min, max) {
   return Math.max(min, Math.min(max, n));
 }
 
+const STOPWORDS = new Set([
+  "de", "des", "du", "la", "le", "les", "un", "une", "et", "en", "au", "aux",
+  "pour", "sur", "dans", "par", "avec", "ce", "ces", "cette", "son", "sa", "ses",
+  "que", "qui", "quoi", "est", "sont", "être", "avoir", "vos", "votre", "nos",
+  "notre", "à", "a", "il", "elle", "ils", "elles", "on", "se", "ne", "pas",
+]);
+
+function normalizeWords(text) {
+  return text
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9\s]/g, " ")
+    .split(/\s+/)
+    .filter((w) => w.length > 2 && !STOPWORDS.has(w));
+}
+
+function wordOverlapPercent(queriesA, queriesB) {
+  const wordsA = new Set(queriesA.flatMap((q) => normalizeWords(q.query)));
+  const wordsB = new Set(queriesB.flatMap((q) => normalizeWords(q.query)));
+  if (wordsA.size === 0 || wordsB.size === 0) return 0;
+  const shared = [...wordsA].filter((w) => wordsB.has(w));
+  const smaller = Math.min(wordsA.size, wordsB.size);
+  return Math.round((shared.length / smaller) * 100);
+}
+
 function computeRecommendation(results, commonQueries) {
   if (results.length !== 2) return null;
 
   const [a, b] = results;
   const smallerQueryCount = Math.min(a.topQueries.length, b.topQueries.length) || 1;
-  const overlapPercent = Math.round((commonQueries.length / smallerQueryCount) * 100);
+  const exactOverlapPercent = Math.round((commonQueries.length / smallerQueryCount) * 100);
+  const wordOverlap = wordOverlapPercent(a.topQueries, b.topQueries);
+  const overlapPercent = Math.max(exactOverlapPercent, wordOverlap);
+
+  const totalQueriesAnalyzed = a.topQueries.length + b.topQueries.length;
+  const totalClicksAnalyzed = a.clicks + b.clicks;
+  let reliability = "élevée";
+  if (totalQueriesAnalyzed < 4 || totalClicksAnalyzed < 15) reliability = "faible";
+  else if (totalQueriesAnalyzed < 10 || totalClicksAnalyzed < 50) reliability = "moyenne";
 
   const totalClicks = a.clicks + b.clicks;
   const shareB = totalClicks > 0 ? b.clicks / totalClicks : 0.5;
@@ -105,17 +139,21 @@ function computeRecommendation(results, commonQueries) {
   if (a.position !== b.position) winnerCounts[a.position < b.position ? "a" : "b"]++;
 
   const signals = [
-    `${overlapPercent}% des requêtes principales sont communes`,
+    `${overlapPercent}% de vocabulaire partagé entre les requêtes principales`,
     `Article A : ${a.clicks} clics, Article B : ${b.clicks} clics`,
     `Article ${winnerCounts.a > winnerCounts.b ? "A" : "B"} gagne sur ${Math.max(winnerCounts.a, winnerCounts.b)} des 4 métriques SEO`,
+    `Basé sur ${totalQueriesAnalyzed} requêtes et ${totalClicksAnalyzed} clics analysés`,
   ];
+
+  const base = { reliability, totalQueriesAnalyzed, totalClicksAnalyzed, overlapPercent };
 
   if (overlapPercent < 20) {
     return {
+      ...base,
       verdict: "keep",
       confidence: clamp(Math.round(95 - overlapPercent * 2), 55, 95),
       headline: "Conserver les deux articles",
-      reason: `Ces deux articles ne partagent que ${overlapPercent}% de leurs requêtes principales : ils répondent à des intentions de recherche différentes et se complètent plutôt qu'ils ne se concurrencent.`,
+      reason: `Ces deux articles ne partagent que ${overlapPercent}% de vocabulaire dans leurs requêtes principales : ils semblent répondre à des intentions de recherche différentes.`,
       signals,
       suggestions: [
         "Ajoutez un maillage interne entre les deux articles pour guider le lecteur de l'un vers l'autre",
@@ -126,10 +164,11 @@ function computeRecommendation(results, commonQueries) {
 
   if (skew < 0.15) {
     return {
+      ...base,
       verdict: "watch",
       confidence: clamp(Math.round(70 - skew * 100), 50, 75),
       headline: "Conserver, mais surveiller la cannibalisation",
-      reason: `${overlapPercent}% de requêtes communes et des performances proches entre les deux articles : ils se concurrencent probablement sur les mêmes résultats Google, sans qu'aucun ne prenne clairement le dessus.`,
+      reason: `${overlapPercent}% de vocabulaire commun et des performances proches entre les deux articles : ils pourraient se concurrencer sur les mêmes résultats Google.`,
       signals,
       suggestions: [
         "Différenciez plus nettement les angles ou les intentions de recherche couvertes par chaque article",
@@ -145,12 +184,13 @@ function computeRecommendation(results, commonQueries) {
   const loserClicks = winnerIsB ? a.clicks : b.clicks;
 
   return {
+    ...base,
     verdict: "redirect",
     confidence: clamp(Math.round(50 + skew * 90), 55, 95),
     winnerLabel,
     loserLabel,
-    headline: `Rediriger l'article ${loserLabel} vers l'article ${winnerLabel}`,
-    reason: `${overlapPercent}% de requêtes communes et l'article ${winnerLabel} capte nettement plus de trafic (${winnerClicks} clics contre ${loserClicks}). Le maintien des deux pages dilue probablement leur potentiel de positionnement.`,
+    headline: `Piste : rediriger l'article ${loserLabel} vers l'article ${winnerLabel}`,
+    reason: `${overlapPercent}% de vocabulaire commun et l'article ${winnerLabel} capte nettement plus de trafic (${winnerClicks} clics contre ${loserClicks}). Le maintien des deux pages pourrait diluer leur potentiel de positionnement.`,
     signals,
     suggestions: [
       `Avant toute redirection, vérifiez qu'aucune information utile de l'article ${loserLabel} n'est absente de l'article ${winnerLabel}`,
