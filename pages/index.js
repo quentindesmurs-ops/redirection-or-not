@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { SITES } from "../lib/sites";
 
 const BADGE_COLORS = ["#2B6CB0", "#0F9B8E", "#D69E2E", "#7C3AED", "#C1440E"];
 const LETTERS = ["A", "B", "C", "D", "E"];
@@ -97,6 +98,7 @@ function RecommendationRing({ rec }) {
 }
 
 export default function Home() {
+  const [siteId, setSiteId] = useState(SITES[0]?.id || "");
   const [urls, setUrls] = useState(["", ""]);
   const [startDate, setStartDate] = useState(defaultStart());
   const [endDate, setEndDate] = useState(defaultEnd());
@@ -131,7 +133,7 @@ export default function Home() {
       const res = await fetch("/api/compare", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ urls: cleanUrls, startDate, endDate }),
+        body: JSON.stringify({ urls: cleanUrls, startDate, endDate, siteId }),
       });
       const json = await res.json();
       if (!res.ok) throw new Error(json.error || "Erreur inconnue");
@@ -185,6 +187,15 @@ export default function Home() {
       </header>
 
       <section className="panel controls">
+        <div className="field-block">
+          <label className="field-label">Site</label>
+          <select className="site-select" value={siteId} onChange={(e) => setSiteId(e.target.value)}>
+            {SITES.map((s) => (
+              <option key={s.id} value={s.id}>{s.label}</option>
+            ))}
+          </select>
+        </div>
+
         <h3>Articles à comparer</h3>
         {urls.map((url, i) => (
           <div className="url-row" key={i}>
@@ -193,7 +204,7 @@ export default function Home() {
             </span>
             <input
               type="text"
-              placeholder="https://www.santemagazine.fr/..."
+              placeholder="https://..."
               value={url}
               onChange={(e) => updateUrl(i, e.target.value)}
             />
@@ -222,7 +233,7 @@ export default function Home() {
       {results.length > 0 && (
         <>
           <section className="panel">
-            <h2 className="panel-title">Performances</h2>
+            <h2 className="panel-title">Performances{data.site ? ` — ${data.site}` : ""}</h2>
             <table>
               <thead>
                 <tr>
@@ -420,6 +431,13 @@ export default function Home() {
         }
         .panel-title { font-size: 17px; margin: 0 0 16px; }
         .controls h3 { margin-top: 0; font-size: 15px; }
+
+        .field-block { margin-bottom: 18px; }
+        .field-label { display: block; font-size: 11.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--ink-soft); margin-bottom: 6px; }
+        .site-select {
+          width: 100%; max-width: 320px; padding: 9px 10px; border: 1px solid var(--line);
+          border-radius: 6px; font-size: 13.5px; background: white; color: var(--ink); font-weight: 600;
+        }
 
         .badge {
           width: 26px; height: 26px; border-radius: 6px; color: white; font-weight: 700;
