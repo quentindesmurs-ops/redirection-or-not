@@ -1,4 +1,5 @@
 import { google } from "googleapis";
+import { SITES } from "../../lib/sites";
 
 function getClient() {
   const credentials = JSON.parse(process.env.GOOGLE_SERVICE_ACCOUNT_JSON);
@@ -164,16 +165,16 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: "Méthode non autorisée" });
   }
 
-  const { urls, startDate, endDate } = req.body;
+  const { urls, startDate, endDate, siteId } = req.body;
 
   if (!urls || !Array.isArray(urls) || urls.length === 0) {
     return res.status(400).json({ error: "Aucune URL fournie" });
   }
 
-  const siteUrl = (process.env.GSC_SITE_URL || "").trim();
+  const site = SITES.find((s) => s.id === siteId) || SITES[0];
 
-  if (!siteUrl) {
-    return res.status(500).json({ error: "GSC_SITE_URL n'est pas configuré sur le serveur." });
+  if (!site) {
+    return res.status(500).json({ error: "Aucune propriété Search Console configurée." });
   }
 
   try {
@@ -183,8 +184,8 @@ export default async function handler(req, res) {
       urls.map(async (rawUrl) => {
         const url = rawUrl.trim();
         const [totals, topQueries, publishedDate] = await Promise.all([
-          fetchTotals(searchconsole, siteUrl, url, startDate, endDate),
-          fetchTopQueries(searchconsole, siteUrl, url, startDate, endDate),
+          fetchTotals(searchconsole, site.siteUrl, url, startDate, endDate),
+          fetchTopQueries(searchconsole, site.siteUrl, url, startDate, endDate),
           fetchPublishedDate(url),
         ]);
         return { url, ...totals, topQueries, publishedDate };
@@ -198,7 +199,7 @@ export default async function handler(req, res) {
 
     const recommendation = computeRecommendation(results, commonQueries);
 
-    return res.status(200).json({ results, commonQueries, recommendation });
+    return res.status(200).json({ results, commonQueries, recommendation, site: site.label });
   } catch (error) {
     console.error(error);
     const detail =
@@ -208,6 +209,6 @@ export default async function handler(req, res) {
       "Erreur inconnue";
     return res
       .status(500)
-      .json({ error: `Erreur Google : ${detail} (site interrogé : "${siteUrl}")` });
+      .json({ error: `Erreur Google : ${detail} (site interrogé : "${site.siteUrl}")` });
   }
 }
