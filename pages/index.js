@@ -10,6 +10,12 @@ const VERDICT_COLOR = {
   redirect: "#C1440E",
 };
 
+const RELIABILITY_COLOR = {
+  "élevée": "#0F9B8E",
+  "moyenne": "#D69E2E",
+  "faible": "#C1440E",
+};
+
 function formatNumber(n) {
   return Math.round(n).toLocaleString("fr-FR");
 }
@@ -158,12 +164,7 @@ export default function Home() {
   const rec = data?.recommendation;
   const isPair = results.length === 2;
 
-  const smallerQueryCount = isPair
-    ? Math.min(results[0].topQueries.length, results[1].topQueries.length) || 1
-    : 0;
-  const overlapPercent = isPair
-    ? Math.round(((data?.commonQueries.length || 0) / smallerQueryCount) * 100)
-    : 0;
+  const overlapPercent = rec?.overlapPercent ?? 0;
 
   let loserIdx = null, winnerIdx = null, atRiskQueries = [], atRiskTotal = 0;
   if (isPair) {
@@ -270,11 +271,11 @@ export default function Home() {
               <div className="metric-cards">
                 <div className="metric-card">
                   <div className="metric-value">{overlapPercent}%</div>
-                  <div className="metric-label">Chevauchement de mots-clés</div>
+                  <div className="metric-label">Vocabulaire partagé</div>
                 </div>
                 <div className="metric-card">
                   <div className="metric-value">{data.commonQueries.length}</div>
-                  <div className="metric-label">Requêtes communes</div>
+                  <div className="metric-label">Requêtes identiques</div>
                 </div>
                 <div className="metric-card">
                   <div className="metric-value">{LETTERS[winnerIdx]}</div>
@@ -300,7 +301,7 @@ export default function Home() {
 
               {data.commonQueries.length > 0 && (
                 <div className="common-queries">
-                  <div className="common-title">Requêtes communes</div>
+                  <div className="common-title">Requêtes identiques</div>
                   <div className="chip-row">
                     {data.commonQueries.map((q, i) => (
                       <span className="chip" key={i}>{q}</span>
@@ -350,7 +351,18 @@ export default function Home() {
 
           {rec && (
             <section className="panel recommendation">
-              <h2 className="panel-title">Recommandation</h2>
+              <div className="rec-top-row">
+                <h2 className="panel-title" style={{ margin: 0 }}>Piste d'analyse</h2>
+                <span className="reliability-badge" style={{ color: RELIABILITY_COLOR[rec.reliability], borderColor: RELIABILITY_COLOR[rec.reliability] }}>
+                  Fiabilité des données : {rec.reliability}
+                </span>
+              </div>
+
+              {rec.reliability === "faible" && (
+                <div className="low-data-warning">
+                  ⚠️ Peu de données disponibles ({rec.totalQueriesAnalyzed} requêtes, {rec.totalClicksAnalyzed} clics analysés) — ce signal est fragile. Élargis la période d'analyse ou vérifie manuellement avant toute décision.
+                </div>
+              )}
 
               <div className="rec-body">
                 <RecommendationRing rec={rec} />
@@ -386,8 +398,17 @@ export default function Home() {
                 </details>
               </div>
 
+              <div className="checklist-box">
+                <div className="checklist-title">✅ Avant d'agir, vérifie par toi-même :</div>
+                <ul className="checklist-list">
+                  <li>Lis les deux articles : traitent-ils vraiment du même sujet et de la même intention de recherche ?</li>
+                  <li>Le contexte éditorial a-t-il changé depuis la publication (actualité, angle, ligne éditoriale) ?</li>
+                  <li>En cas de doute, demande un second avis avant toute redirection.</li>
+                </ul>
+              </div>
+
               <p className="rec-disclaimer">
-                Recommandation calculée automatiquement à partir des données Search Console (mots-clés et trafic). Elle ne remplace pas une lecture éditoriale des deux articles.
+                Cette piste est calculée automatiquement à partir des mots-clés et du trafic Search Console. Elle ne remplace pas une lecture éditoriale des deux articles — la décision finale te revient.
               </p>
             </section>
           )}
@@ -509,6 +530,17 @@ export default function Home() {
         .risk-total span:first-child { font-size: 13px; font-weight: 700; }
         .risk-total-value { font-size: 20px; font-weight: 800; color: var(--accent); }
 
+        .rec-top-row { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px; margin-bottom: 14px; }
+        .reliability-badge {
+          font-size: 11px; font-weight: 700; border: 1px solid; border-radius: 12px;
+          padding: 4px 11px;
+        }
+        .low-data-warning {
+          background: #FDEDEA; border: 1px solid #F1C6B4; color: var(--accent);
+          border-radius: 8px; padding: 12px 14px; font-size: 12.5px; font-weight: 600;
+          margin-bottom: 18px; line-height: 1.5;
+        }
+
         .rec-body { display: flex; flex-direction: column; align-items: center; gap: 12px; }
         .rec-headline { font-size: 20px; font-weight: 700; text-align: center; }
         .age-pills { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; }
@@ -529,6 +561,14 @@ export default function Home() {
         .rec-list { margin: 0; padding-left: 18px; font-size: 13px; line-height: 1.6; }
         .rec-list.arrows { list-style: none; padding-left: 0; }
         .rec-list.arrows li::before { content: "→ "; color: var(--accent); font-weight: 700; }
+
+        .checklist-box {
+          background: var(--paper); border: 1px solid var(--line); border-radius: 8px;
+          padding: 16px 18px; margin-top: 20px;
+        }
+        .checklist-title { font-size: 13px; font-weight: 700; margin-bottom: 8px; }
+        .checklist-list { margin: 0; padding-left: 18px; font-size: 12.5px; line-height: 1.6; color: var(--ink-soft); }
+
         .rec-disclaimer {
           font-size: 11px; color: var(--ink-soft); border-top: 1px solid var(--line);
           padding-top: 12px; margin: 18px 0 0;
